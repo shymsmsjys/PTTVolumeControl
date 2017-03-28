@@ -4,12 +4,12 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
-import android.graphics.PointF;
+import android.media.AudioManager;
+import android.media.ToneGenerator;
 import android.util.Log;
 import android.view.GestureDetector;
 import android.view.GestureDetector.OnGestureListener;
 import android.view.MotionEvent;
-import android.view.View;
 import android.widget.ImageView;
 import android.widget.ImageView.ScaleType;
 import android.widget.RelativeLayout;
@@ -49,6 +49,11 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 	private Bitmap 				bmpRotorOn , bmpRotorOff;
 	private boolean 			mState = false;
 	private int					m_nWidth = 0, m_nHeight = 0;
+	private boolean mKeepTouching;
+	private Position mPrevPos;
+	private Position mCurrPos;
+    ToneGenerator mToneGenerator;
+
 	
 	interface RoundKnobButtonListener {
 		public void onStateChange(boolean newstate) ;
@@ -102,6 +107,9 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 		SetState(mState);
 		// enable gesture detector
 		gestureDetector = new GestureDetector(getContext(), this);
+        mPrevPos = new Position();
+        mCurrPos = new Position();
+        mToneGenerator = new ToneGenerator(AudioManager.STREAM_ALARM, 100);
 	}
 	
 	/**
@@ -124,6 +132,7 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 		float x = event.getX() / ((float) getWidth());
 		float y = event.getY() / ((float) getHeight());
 		mAngleDown = cartesianToPolar(1 - x, 1 - y);// 1- to correct our custom axis direction
+		mKeepTouching = true;
 		return true;
 	}
 	
@@ -137,6 +146,8 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 			SetState(!mState);
 			if (m_listener != null) m_listener.onStateChange(mState);
 		}
+		mKeepTouching = false;
+        Log.d ("ROT" , "whichQuadrant() = " + whichQuadrant(x,y));
 		return true;
 	}
 
@@ -161,6 +172,12 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 	public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
 		float x = e2.getX() / ((float) getWidth());
 		float y = e2.getY() / ((float) getHeight());
+        mCurrPos.x = x;
+        mCurrPos.y = y;
+        Log.d("ROT", "mPrevPos(x, y) = (" + mPrevPos.x + ", " + mPrevPos.y + ")");
+        Log.d("ROT", "mCurrPos(x, y) = (" + mCurrPos.x + ", " + mCurrPos.y + ")");
+
+		Log.d ("ROT", "isRatateClockwise?  " +  isRotatingClockwise(mPrevPos, mCurrPos));
 		float rotDegrees = cartesianToPolar(1 - x, 1 - y);// 1- to correct our custom axis direction
 		
 		if (! Float.isNaN(rotDegrees)) {
@@ -177,6 +194,10 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 				// get position percent
 				int percent = (int) (scaleDegrees / 3);
 				if (m_listener != null) m_listener.onRotate(percent);
+                mPrevPos.x = mCurrPos.x;
+                mPrevPos.y = mCurrPos.y;
+                Log.d("ROT", "mPrevPos = " + mPrevPos);
+
 				return true; //consumed
 			} else
 				return false;
@@ -192,8 +213,81 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 
 	public void onLongPress(MotionEvent e) {	}
 
-	
+	private class Position {
+		float x;
+		float y;
+	}
 
+	enum Quadrant {
+		FIRST,
+		SECOND,
+		THIRD,
+		FORTH
+	}
+
+	private boolean currDirection = true;
+    private boolean prevDirection = true;
+
+	boolean isRotatingClockwise(Position p, Position c) {
+//        p.x = 0.13315888f; p.y = 0.5021704f;
+//        p.x = 0.14370392f; p.y = 0.48100317f;
+        prevDirection = currDirection;
+        float prevPos = cartesianToPolar(1 - p.x, 1 - p.y);
+        if (prevPos < 0) prevPos = 360 + prevPos;
+
+        float currPos = cartesianToPolar(1 - c.x, 1 - c.y);
+        if (currPos < 0) currPos = 360 + currPos;
+
+        float diff = currPos - prevPos;
+
+        if (whichQuadrant(p.x, p.y) == Quadrant.FORTH) {
+            if (whichQuadrant(c.x, c.y) == Quadrant.FIRST) {
+                currDirection = true;
+                if (currDirection != prevDirection) {
+                    mToneGenerator.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200);
+                }
+
+                return true;
+            }
+        }
+
+        if (whichQuadrant(c.x, c.y) == Quadrant.FORTH) {
+            if (whichQuadrant(p.x, p.y) == Quadrant.FIRST)
+                currDirection = false;
+                if (currDirection != prevDirection) {
+                    mToneGenerator.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200);
+                }
+
+                return false;
+        }
+
+        if (diff >= 0 ) {
+            currDirection = true;
+            if (currDirection != prevDirection) {
+                mToneGenerator.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200);
+            }
+
+            return true;
+        }
+
+        currDirection = false;
+        if (currDirection != prevDirection) {
+            mToneGenerator.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200);
+        }
+
+		return false;
+	}
+
+	Quadrant whichQuadrant(float x, float y) {
+        Quadrant quad = Quadrant.FIRST;
+
+        if (x <= 0.5 && y <= 0.5) quad = Quadrant.FORTH;
+		else if (x >= 0.5 && y <= 0.5) quad = Quadrant.FIRST;
+		else if (x >= 0.5 && y >= 0.5 ) quad = Quadrant.SECOND;
+		else if (x <= 0.5 && y >= 0.5) quad = Quadrant.THIRD;
+
+        return quad;
+	}
 
 
 }

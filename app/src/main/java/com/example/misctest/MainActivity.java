@@ -71,7 +71,7 @@ public class MainActivity extends Activity {
 		lp.addRule(RelativeLayout.CENTER_IN_PARENT);
 		panel.addView(rv, lp);
         
-        rv.setRotorPercentage(100);
+        rv.setRotorPercentage(0);
         rv.SetListener(new RoundKnobButtonListener() {
 			public void onStateChange(boolean newstate) {
 				Toast.makeText(MainActivity.this,  "New state:"+newstate,  Toast.LENGTH_SHORT).show();
