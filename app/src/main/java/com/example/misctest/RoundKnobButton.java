@@ -43,13 +43,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 public class RoundKnobButton extends RelativeLayout implements OnGestureListener {
 
-	private GestureDetector 	gestureDetector;
-	private float 				mAngleDown , mAngleUp;
-	private ImageView			ivRotor;
-	private Bitmap 				bmpRotorOn , bmpRotorOff;
-	private boolean 			mState = false;
-	private int					m_nWidth = 0, m_nHeight = 0;
-	private boolean mKeepTouching;
+	private GestureDetector gestureDetector;
+	private float mAngleDown , mAngleUp;
+	private ImageView ivRotor;
+	private Bitmap bmpRotorOn , bmpRotorOff;
+	private boolean mState = false;
+	private int m_nWidth = 0, m_nHeight = 0;
 	private Position mPrevPos;
 	private Position mCurrPos;
     private ToneGenerator mToneGenerator;
@@ -135,7 +134,6 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 		float x = event.getX() / ((float) getWidth());
 		float y = event.getY() / ((float) getHeight());
 		mAngleDown = cartesianToPolar(1 - x, 1 - y);// 1- to correct our custom axis direction
-		mKeepTouching = true;
 		return true;
 	}
 	
@@ -149,7 +147,6 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 			SetState(!mState);
 			if (m_listener != null) m_listener.onStateChange(mState);
 		}
-		mKeepTouching = false;
         Log.d ("ROT" , "whichQuadrant() = " + whichQuadrant(x,y));
 		return true;
 	}
@@ -182,23 +179,42 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 //
 		Log.d ("ROT", "isRatateClockwise?  " +  isRotatingClockwise(mPrevPos, mCurrPos));
 
+        float prevPos = cartesianToPolar(1 - mPrevPos.x, 1 - mPrevPos.y);
+        if (prevPos < 0) prevPos = 360 + prevPos;
 
+        float currPos = cartesianToPolar(1 - mCurrPos.x, 1 - mCurrPos.y);
+        if (currPos < 0) currPos = 360 + currPos;
 
+        int diff = (int)(Math.abs(currPos - prevPos));
 
-        if (mPercent <= 1 && !isRotatingClockwise(mPrevPos, mCurrPos)) {
-            Log.d ("ROT", "limited 0");
-            mPrevPos.x = mCurrPos.x;
-            mPrevPos.y = mCurrPos.y;
-            mExceedLimit = true;
-            return false;
+        int min = 0 + diff / 3;
+        int max = 100 - diff / 3;
+        /*if (diff > 18) {
+            min = 6;
+            max = 94;
+        }*/
+        if (mPercent < 8) {
+            if (mPercent <= min && !isRotatingClockwise(mPrevPos, mCurrPos)) {
+                Log.d("ROT", "limited 0");
+                mPrevPos.x = mCurrPos.x;
+                mPrevPos.y = mCurrPos.y;
+                mExceedLimit = true;
+                mPercent = 0;
+                if (m_listener != null) m_listener.onRotate(mPercent);
+                return false;
+            }
         }
 
-        if (mPercent >= 98 && isRotatingClockwise(mPrevPos, mCurrPos)) {
-            Log.d ("ROT", "limited 100");
-            mPrevPos.x = mCurrPos.x;
-            mPrevPos.y = mCurrPos.y;
-            mExceedLimit = true;
-            return false;
+        if (mPercent > 92) {
+            if (mPercent >= max && isRotatingClockwise(mPrevPos, mCurrPos)) {
+                Log.d("ROT", "limited 100");
+                mPrevPos.x = mCurrPos.x;
+                mPrevPos.y = mCurrPos.y;
+                mExceedLimit = true;
+                mPercent = 100;
+                if (m_listener != null) m_listener.onRotate(mPercent);
+                return false;
+            }
         }
 
 
