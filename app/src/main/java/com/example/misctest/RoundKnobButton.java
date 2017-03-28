@@ -52,7 +52,9 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 	private boolean mKeepTouching;
 	private Position mPrevPos;
 	private Position mCurrPos;
-    ToneGenerator mToneGenerator;
+    private ToneGenerator mToneGenerator;
+    private int mPercent;
+    private boolean mExceedLimit;
 
 	
 	interface RoundKnobButtonListener {
@@ -110,6 +112,7 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
         mPrevPos = new Position();
         mCurrPos = new Position();
         mToneGenerator = new ToneGenerator(AudioManager.STREAM_ALARM, 100);
+        mExceedLimit = true;
 	}
 	
 	/**
@@ -174,35 +177,91 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 		float y = e2.getY() / ((float) getHeight());
         mCurrPos.x = x;
         mCurrPos.y = y;
-        Log.d("ROT", "mPrevPos(x, y) = (" + mPrevPos.x + ", " + mPrevPos.y + ")");
-        Log.d("ROT", "mCurrPos(x, y) = (" + mCurrPos.x + ", " + mCurrPos.y + ")");
-
+//        Log.d("ROT", "mPrevPos(x, y) = (" + mPrevPos.x + ", " + mPrevPos.y + ")");
+//        Log.d("ROT", "mCurrPos(x, y) = (" + mCurrPos.x + ", " + mCurrPos.y + ")");
+//
 		Log.d ("ROT", "isRatateClockwise?  " +  isRotatingClockwise(mPrevPos, mCurrPos));
+
+
+
+
+        if (mPercent <= 1 && !isRotatingClockwise(mPrevPos, mCurrPos)) {
+            Log.d ("ROT", "limited 0");
+            mPrevPos.x = mCurrPos.x;
+            mPrevPos.y = mCurrPos.y;
+            mExceedLimit = true;
+            return false;
+        }
+
+        if (mPercent >= 98 && isRotatingClockwise(mPrevPos, mCurrPos)) {
+            Log.d ("ROT", "limited 100");
+            mPrevPos.x = mCurrPos.x;
+            mPrevPos.y = mCurrPos.y;
+            mExceedLimit = true;
+            return false;
+        }
+
+
 		float rotDegrees = cartesianToPolar(1 - x, 1 - y);// 1- to correct our custom axis direction
-		
+
+
+
 		if (! Float.isNaN(rotDegrees)) {
 			// instead of getting 0-> 180, -180 0 , we go for 0 -> 360
 			float posDegrees = rotDegrees;
 			if (rotDegrees < 0) posDegrees = 360 + rotDegrees;
-			
-			// deny full rotation, start start and stop point, and get a linear scale
+
+            // 최대/최소를 넘긴 상황에서 방향이 바뀌었나?
+            // 0보다 크거나 100 보다 작으면 진행 아니면 return
+
+
+                if (mPercent <= 1)
+                {
+                    if (isRotatingClockwise(mPrevPos, mCurrPos)
+                        && posDegrees >= 210) {
+                        mExceedLimit = false;
+                    }
+                }
+
+                if (mPercent >= 98)
+                {
+                    if (!isRotatingClockwise(mPrevPos, mCurrPos)
+                            && posDegrees <= 150) {
+                        mExceedLimit = false;
+                    }
+                }
+
+            if (mExceedLimit) {
+                mPrevPos.x = mCurrPos.x;
+                mPrevPos.y = mCurrPos.y;
+                return false;
+            }
+
+
+            // deny full rotation, start start and stop point, and get a linear scale
 			if (posDegrees > 210 || posDegrees < 150) {
 				// rotate our imageview
 				setRotorPosAngle(posDegrees);
 				// get a linear scale
 				float scaleDegrees = rotDegrees + 150; // given the current parameters, we go from 0 to 300
 				// get position percent
-				int percent = (int) (scaleDegrees / 3);
-				if (m_listener != null) m_listener.onRotate(percent);
+				mPercent = (int) (scaleDegrees / 3);
+				if (m_listener != null) m_listener.onRotate(mPercent);
                 mPrevPos.x = mCurrPos.x;
                 mPrevPos.y = mCurrPos.y;
                 Log.d("ROT", "mPrevPos = " + mPrevPos);
 
 				return true; //consumed
-			} else
-				return false;
-		} else
-			return false; // not consumed
+			} else {
+                mPrevPos.x = mCurrPos.x;
+                mPrevPos.y = mCurrPos.y;
+                return false;
+            }
+		} else {
+            mPrevPos.x = mCurrPos.x;
+            mPrevPos.y = mCurrPos.y;
+            return false; // not consumed
+        }
 	}
 
 	public void onShowPress(MotionEvent e) {
@@ -228,9 +287,13 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 	private boolean currDirection = true;
     private boolean prevDirection = true;
 
+    private boolean isDirectionChanged() {
+        return !(prevDirection == currDirection);
+    }
+
 	boolean isRotatingClockwise(Position p, Position c) {
-//        p.x = 0.13315888f; p.y = 0.5021704f;
-//        p.x = 0.14370392f; p.y = 0.48100317f;
+//        p.x = -0.2177445f; p.y = 0.5021704f;
+//        c.x = -0.2177445f; c.y = 0.49648315f;
         prevDirection = currDirection;
         float prevPos = cartesianToPolar(1 - p.x, 1 - p.y);
         if (prevPos < 0) prevPos = 360 + prevPos;
@@ -238,7 +301,10 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
         float currPos = cartesianToPolar(1 - c.x, 1 - c.y);
         if (currPos < 0) currPos = 360 + currPos;
 
+        Log.d("ROT", "mPrevPos(x, y) = (" + mPrevPos.x + ", " + mPrevPos.y + ")");
+        Log.d("ROT", "mCurrPos(x, y) = (" + mCurrPos.x + ", " + mCurrPos.y + ")");
         float diff = currPos - prevPos;
+        Log.d("ROT", "diff = " + diff);
 
         if (whichQuadrant(p.x, p.y) == Quadrant.FORTH) {
             if (whichQuadrant(c.x, c.y) == Quadrant.FIRST) {
@@ -252,13 +318,15 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
         }
 
         if (whichQuadrant(c.x, c.y) == Quadrant.FORTH) {
-            if (whichQuadrant(p.x, p.y) == Quadrant.FIRST)
+            if (whichQuadrant(p.x, p.y) == Quadrant.FIRST) {
+                Log.d("ROT", "move first to forth quadrant");
                 currDirection = false;
                 if (currDirection != prevDirection) {
                     mToneGenerator.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200);
                 }
 
                 return false;
+            }
         }
 
         if (diff >= 0 ) {
@@ -266,7 +334,7 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
             if (currDirection != prevDirection) {
                 mToneGenerator.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200);
             }
-
+            Log.d("ROT", "diff > 0 return true ");
             return true;
         }
 
@@ -274,7 +342,7 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
         if (currDirection != prevDirection) {
             mToneGenerator.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200);
         }
-
+        Log.d("ROT", "return false ");
 		return false;
 	}
 
@@ -286,6 +354,7 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 		else if (x >= 0.5 && y >= 0.5 ) quad = Quadrant.SECOND;
 		else if (x <= 0.5 && y >= 0.5) quad = Quadrant.THIRD;
 
+        Log.d("ROT", "quatrant = " + quad );
         return quad;
 	}
 
