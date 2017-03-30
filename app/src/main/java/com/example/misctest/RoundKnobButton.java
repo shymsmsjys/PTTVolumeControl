@@ -172,6 +172,9 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 	public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
 		float x = e2.getX() / ((float) getWidth());
 		float y = e2.getY() / ((float) getHeight());
+
+        float rotDegrees = cartesianToPolar(1 - x, 1 - y);// 1- to correct our custom axis direction
+
         mCurrPos.x = x;
         mCurrPos.y = y;
 //        Log.d("ROT", "mPrevPos(x, y) = (" + mPrevPos.x + ", " + mPrevPos.y + ")");
@@ -187,13 +190,12 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 
         int diff = (int)(Math.abs(currPos - prevPos));
 
+        // 급격히 움직일 경우 각도 차이가 꺼서 아래 조건에 진입 시키기 위한 계산
         int min = 0 + diff / 3;
         int max = 100 - diff / 3;
-        /*if (diff > 18) {
-            min = 6;
-            max = 94;
-        }*/
-        if (mPercent < 8) {
+
+        // 0 또는 100을 넘어서 회전하지 않도록 하기 위한 조건
+        if (rotDegrees < -110) {
             if (mPercent <= min && !isRotatingClockwise(mPrevPos, mCurrPos)) {
                 Log.d("ROT", "limited 0");
                 mPrevPos.x = mCurrPos.x;
@@ -205,7 +207,7 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
             }
         }
 
-        if (mPercent > 92) {
+        if (rotDegrees > 110) {
             if (mPercent >= max && isRotatingClockwise(mPrevPos, mCurrPos)) {
                 Log.d("ROT", "limited 100");
                 mPrevPos.x = mCurrPos.x;
@@ -217,11 +219,6 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
             }
         }
 
-
-		float rotDegrees = cartesianToPolar(1 - x, 1 - y);// 1- to correct our custom axis direction
-
-
-
 		if (! Float.isNaN(rotDegrees)) {
 			// instead of getting 0-> 180, -180 0 , we go for 0 -> 360
 			float posDegrees = rotDegrees;
@@ -230,22 +227,21 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
             // 최대/최소를 넘긴 상황에서 방향이 바뀌었나?
             // 0보다 크거나 100 보다 작으면 진행 아니면 return
 
-
-                if (mPercent <= 1)
-                {
-                    if (isRotatingClockwise(mPrevPos, mCurrPos)
+            if (mPercent <= 1)
+            {
+                if (isRotatingClockwise(mPrevPos, mCurrPos)
                         && posDegrees >= 210) {
-                        mExceedLimit = false;
-                    }
+                    mExceedLimit = false;
                 }
+            }
 
-                if (mPercent >= 98)
-                {
-                    if (!isRotatingClockwise(mPrevPos, mCurrPos)
-                            && posDegrees <= 150) {
-                        mExceedLimit = false;
-                    }
+            if (mPercent >= 99)
+            {
+                if (!isRotatingClockwise(mPrevPos, mCurrPos)
+                        && posDegrees <= 150) {
+                    mExceedLimit = false;
                 }
+            }
 
             if (mExceedLimit) {
                 mPrevPos.x = mCurrPos.x;
