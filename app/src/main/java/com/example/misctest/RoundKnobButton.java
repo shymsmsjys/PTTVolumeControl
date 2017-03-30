@@ -228,7 +228,7 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
             if (mPercent <= 1)
             {
                 if (isRotatingClockwise(mPrevPos, mCurrPos)
-                        && posDegrees >= 210) {
+                        && posDegrees >= 210 && posDegrees <= 230) {
                     mExceedLimit = false;
                 }
             }
@@ -236,7 +236,7 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
             if (mPercent >= 99)
             {
                 if (!isRotatingClockwise(mPrevPos, mCurrPos)
-                        && posDegrees <= 150) {
+                        && posDegrees <= 150 && posDegrees >= 130) {
                     mExceedLimit = false;
                 }
             }
