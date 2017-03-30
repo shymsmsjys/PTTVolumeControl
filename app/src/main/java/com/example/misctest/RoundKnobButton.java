@@ -177,22 +177,20 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 
         mCurrPos.x = x;
         mCurrPos.y = y;
-//        Log.d("ROT", "mPrevPos(x, y) = (" + mPrevPos.x + ", " + mPrevPos.y + ")");
-//        Log.d("ROT", "mCurrPos(x, y) = (" + mCurrPos.x + ", " + mCurrPos.y + ")");
 //
-		Log.d ("ROT", "isRatateClockwise?  " +  isRotatingClockwise(mPrevPos, mCurrPos));
-
         float prevPos = cartesianToPolar(1 - mPrevPos.x, 1 - mPrevPos.y);
         if (prevPos < 0) prevPos = 360 + prevPos;
 
-        float currPos = cartesianToPolar(1 - mCurrPos.x, 1 - mCurrPos.y);
+        float currPos = rotDegrees;
         if (currPos < 0) currPos = 360 + currPos;
 
         int diff = (int)(Math.abs(currPos - prevPos));
 
-        // 급격히 움직일 경우 각도 차이가 꺼서 아래 조건에 진입 시키기 위한 계산
+        // 급격히 움직일 경우 각도 차이가 커서 아래 조건에 진입 시키기 위한 계산
         int min = 0 + diff / 3;
-        int max = 100 - diff / 3;
+        double max = 99.5 - diff / 3;
+
+        Log.d("ROT", "diff = " + diff + "max = " + max);
 
         // 0 또는 100을 넘어서 회전하지 않도록 하기 위한 조건
         if (rotDegrees < -110) {
@@ -208,7 +206,7 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
         }
 
         if (rotDegrees > 110) {
-            if (mPercent >= max && isRotatingClockwise(mPrevPos, mCurrPos)) {
+            if (mPercent >= Math.abs(max) && isRotatingClockwise(mPrevPos, mCurrPos)) {
                 Log.d("ROT", "limited 100");
                 mPrevPos.x = mCurrPos.x;
                 mPrevPos.y = mCurrPos.y;
