@@ -134,6 +134,8 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 		float x = event.getX() / ((float) getWidth());
 		float y = event.getY() / ((float) getHeight());
 		mAngleDown = cartesianToPolar(1 - x, 1 - y);// 1- to correct our custom axis direction
+        mPrevPos.x = x;
+        mPrevPos.y = y;
 		return true;
 	}
 	
