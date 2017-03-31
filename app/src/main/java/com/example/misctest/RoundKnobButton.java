@@ -42,6 +42,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 ****************************************************************************/
 
 public class RoundKnobButton extends RelativeLayout implements OnGestureListener {
+	private static final String TAG = "RoundKnobButton";
 
 	private GestureDetector gestureDetector;
 	private float mAngleDown , mAngleUp;
@@ -54,6 +55,7 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
     private ToneGenerator mToneGenerator;
     private int mPercent;
     private boolean mExceedLimit;
+    private float mKnobPostion;
 
 	
 	interface RoundKnobButtonListener {
@@ -155,8 +157,8 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 
 	public void setRotorPosAngle(float deg) {
 
-		if (deg >= 210 || deg <= 150) {
-			if (deg > 180) deg = deg - 360;
+		/*if (deg >= 210 || deg <= 150)*/ {
+//			if (deg > 180) deg = deg - 360;
 			Matrix matrix=new Matrix();
 			ivRotor.setScaleType(ScaleType.MATRIX);   
 			matrix.postRotate((float) deg, m_nWidth/2, m_nHeight/2);//getWidth()/2, getHeight()/2);
@@ -166,7 +168,8 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 	
 	public void setRotorPercentage(int percentage) {
 		int posDegree = percentage * 3 - 150;
-		if (posDegree < 0) posDegree = 360 + posDegree;
+//		if (posDegree < 0) posDegree = 360 + posDegree;
+        mKnobPostion  = posDegree;
 		setRotorPosAngle(posDegree);
 	}
 	
@@ -181,43 +184,80 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
         mCurrPos.y = y;
 //
         float prevPos = cartesianToPolar(1 - mPrevPos.x, 1 - mPrevPos.y);
-        if (prevPos < 0) prevPos = 360 + prevPos;
+//        if (prevPos < 0) prevPos = 360 + prevPos;
 
         float currPos = rotDegrees;
-        if (currPos < 0) currPos = 360 + currPos;
+//        if (currPos < 0) currPos = 360 + currPos;
 
-        int diff = (int)(Math.abs(currPos - prevPos));
+//        int diff = (int)(Math.abs(currPos - prevPos));
+		float diff;
+		if (isRotatingClockwise(mPrevPos, mCurrPos)) {
+			if (prevPos < 0 && currPos > 0) {
+				diff = currPos - prevPos;
+				Log.d(TAG, "diff 1");
+			} else if (prevPos > 0 && currPos < 0) {
+				diff = 180 - prevPos + 180 + currPos;
+				Log.d(TAG, "diff 2");
+			} else {
+				diff = currPos - prevPos;
+				Log.d(TAG, "diff 5");
+			}
+		} else {
+			if (prevPos > 0 && currPos < 0) {
+				diff = currPos - prevPos;
+				Log.d(TAG, "diff 3");
+			} else if (prevPos < 0 && currPos > 0) {
+				diff = -(180 - currPos + 180 + prevPos);
+				Log.d(TAG, "diff 4");
+			} else {
+				diff = currPos - prevPos;
+				Log.d(TAG, "diff 6");
+			}
+		}
+        mKnobPostion += diff;
+
+		Log.d (TAG, "diff = " + diff + ", knob position = " + mKnobPostion);
+
+        if (mKnobPostion < -150) {
+            mKnobPostion = -150;
+        }
+
+		if (mKnobPostion == -150) {
+			if (!isRotatingClockwise(mPrevPos, mCurrPos)) {
+				Log.d("ROT", "limited 0");
+				mPrevPos.x = mCurrPos.x;
+				mPrevPos.y = mCurrPos.y;
+				mExceedLimit = true;
+				mPercent = 0;
+				if (m_listener != null) m_listener.onRotate(mPercent);
+				return false;
+			}
+		}
+
+        if (mKnobPostion > 150) {
+            mKnobPostion = 150;
+        }
+
+		if (mKnobPostion == 150) {
+			if (isRotatingClockwise(mPrevPos, mCurrPos)) {
+				Log.d("ROT", "limited 100");
+				mPrevPos.x = mCurrPos.x;
+				mPrevPos.y = mCurrPos.y;
+				mExceedLimit = true;
+				mPercent = 100;
+				if (m_listener != null) m_listener.onRotate(mPercent);
+				return false;
+			}
+		}
 
         // 급격히 움직일 경우 각도 차이가 커서 아래 조건에 진입 시키기 위한 계산
-        int min = 0 + diff / 3;
-        double max = 99.5 - diff / 3;
+//        int min = 0 + diff / 3;
+//        double max = 99.5 - diff / 3;
 
-        Log.d("ROT", "diff = " + diff + "max = " + max);
+//        Log.d("ROT", "diff = " + diff + "max = " + max);
 
         // 0 또는 100을 넘어서 회전하지 않도록 하기 위한 조건
-        if (rotDegrees < -110) {
-            if (mPercent <= min && !isRotatingClockwise(mPrevPos, mCurrPos)) {
-                Log.d("ROT", "limited 0");
-                mPrevPos.x = mCurrPos.x;
-                mPrevPos.y = mCurrPos.y;
-                mExceedLimit = true;
-                mPercent = 0;
-                if (m_listener != null) m_listener.onRotate(mPercent);
-                return false;
-            }
-        }
 
-        if (rotDegrees > 110) {
-            if (mPercent >= Math.abs(max) && isRotatingClockwise(mPrevPos, mCurrPos)) {
-                Log.d("ROT", "limited 100");
-                mPrevPos.x = mCurrPos.x;
-                mPrevPos.y = mCurrPos.y;
-                mExceedLimit = true;
-                mPercent = 100;
-                if (m_listener != null) m_listener.onRotate(mPercent);
-                return false;
-            }
-        }
 
 		if (! Float.isNaN(rotDegrees)) {
 			// instead of getting 0-> 180, -180 0 , we go for 0 -> 360
@@ -227,7 +267,7 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
             // 최대/최소를 넘긴 상황에서 방향이 바뀌었나?
             // 0보다 크거나 100 보다 작으면 진행 아니면 return
 
-            if (mPercent <= 1)
+            /*if (mPercent <= 1)
             {
                 if (isRotatingClockwise(mPrevPos, mCurrPos)
                         && posDegrees >= 210 && posDegrees <= 230) {
@@ -247,15 +287,15 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
                 mPrevPos.x = mCurrPos.x;
                 mPrevPos.y = mCurrPos.y;
                 return false;
-            }
+            }*/
 
 
             // deny full rotation, start start and stop point, and get a linear scale
-			if (posDegrees > 210 || posDegrees < 150) {
+			if (mKnobPostion >= -150 &&  mKnobPostion <= 150) {
 				// rotate our imageview
-				setRotorPosAngle(posDegrees);
+				setRotorPosAngle(mKnobPostion);
 				// get a linear scale
-				float scaleDegrees = rotDegrees + 150; // given the current parameters, we go from 0 to 300
+				float scaleDegrees = mKnobPostion + 150; // given the current parameters, we go from 0 to 300
 				// get position percent
 				mPercent = (int) (scaleDegrees / 3);
 				if (m_listener != null) m_listener.onRotate(mPercent);
