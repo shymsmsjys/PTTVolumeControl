@@ -43,6 +43,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 public class RoundKnobButton extends RelativeLayout implements OnGestureListener {
 	private static final String TAG = "RoundKnobButton";
+	private  final boolean DBG = false;
 
 	private GestureDetector gestureDetector;
 	private float mAngleDown , mAngleUp;
@@ -151,7 +152,7 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 			SetState(!mState);
 			if (m_listener != null) m_listener.onStateChange(mState);
 		}
-        Log.d ("ROT" , "whichQuadrant() = " + whichQuadrant(x,y));
+        if (DBG) Log.d ("ROT" , "whichQuadrant() = " + whichQuadrant(x,y));
 		return true;
 	}
 
@@ -194,29 +195,23 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 		if (isRotatingClockwise(mPrevPos, mCurrPos)) {
 			if (prevPos < 0 && currPos > 0) {
 				diff = currPos - prevPos;
-				Log.d(TAG, "diff 1");
 			} else if (prevPos > 0 && currPos < 0) {
 				diff = 180 - prevPos + 180 + currPos;
-				Log.d(TAG, "diff 2");
 			} else {
 				diff = currPos - prevPos;
-				Log.d(TAG, "diff 5");
 			}
 		} else {
 			if (prevPos > 0 && currPos < 0) {
 				diff = currPos - prevPos;
-				Log.d(TAG, "diff 3");
 			} else if (prevPos < 0 && currPos > 0) {
 				diff = -(180 - currPos + 180 + prevPos);
-				Log.d(TAG, "diff 4");
 			} else {
 				diff = currPos - prevPos;
-				Log.d(TAG, "diff 6");
 			}
 		}
         mKnobPostion += diff;
 
-		Log.d (TAG, "diff = " + diff + ", knob position = " + mKnobPostion);
+		if (DBG) Log.d (TAG, "diff = " + diff + ", knob position = " + mKnobPostion);
 
         if (mKnobPostion < -150) {
             mKnobPostion = -150;
@@ -224,13 +219,14 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 
 		if (mKnobPostion == -150) {
 			if (!isRotatingClockwise(mPrevPos, mCurrPos)) {
-				Log.d("ROT", "limited 0");
+				if (DBG) Log.d(TAG, "limited 0");
 				mPrevPos.x = mCurrPos.x;
 				mPrevPos.y = mCurrPos.y;
 				mExceedLimit = true;
+				setRotorPosAngle(mKnobPostion);
 				mPercent = 0;
 				if (m_listener != null) m_listener.onRotate(mPercent);
-				return false;
+				return true;
 			}
 		}
 
@@ -240,55 +236,21 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 
 		if (mKnobPostion == 150) {
 			if (isRotatingClockwise(mPrevPos, mCurrPos)) {
-				Log.d("ROT", "limited 100");
+				if (DBG) Log.d(TAG, "limited 100");
 				mPrevPos.x = mCurrPos.x;
 				mPrevPos.y = mCurrPos.y;
 				mExceedLimit = true;
+				setRotorPosAngle(mKnobPostion);
 				mPercent = 100;
 				if (m_listener != null) m_listener.onRotate(mPercent);
-				return false;
+				return true;
 			}
 		}
-
-        // 급격히 움직일 경우 각도 차이가 커서 아래 조건에 진입 시키기 위한 계산
-//        int min = 0 + diff / 3;
-//        double max = 99.5 - diff / 3;
-
-//        Log.d("ROT", "diff = " + diff + "max = " + max);
-
-        // 0 또는 100을 넘어서 회전하지 않도록 하기 위한 조건
-
 
 		if (! Float.isNaN(rotDegrees)) {
 			// instead of getting 0-> 180, -180 0 , we go for 0 -> 360
 			float posDegrees = rotDegrees;
 			if (rotDegrees < 0) posDegrees = 360 + rotDegrees;
-
-            // 최대/최소를 넘긴 상황에서 방향이 바뀌었나?
-            // 0보다 크거나 100 보다 작으면 진행 아니면 return
-
-            /*if (mPercent <= 1)
-            {
-                if (isRotatingClockwise(mPrevPos, mCurrPos)
-                        && posDegrees >= 210 && posDegrees <= 230) {
-                    mExceedLimit = false;
-                }
-            }
-
-            if (mPercent >= 99)
-            {
-                if (!isRotatingClockwise(mPrevPos, mCurrPos)
-                        && posDegrees <= 150 && posDegrees >= 130) {
-                    mExceedLimit = false;
-                }
-            }
-
-            if (mExceedLimit) {
-                mPrevPos.x = mCurrPos.x;
-                mPrevPos.y = mCurrPos.y;
-                return false;
-            }*/
-
 
             // deny full rotation, start start and stop point, and get a linear scale
 			if (mKnobPostion >= -150 &&  mKnobPostion <= 150) {
@@ -301,8 +263,6 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 				if (m_listener != null) m_listener.onRotate(mPercent);
                 mPrevPos.x = mCurrPos.x;
                 mPrevPos.y = mCurrPos.y;
-                Log.d("ROT", "mPrevPos = " + mPrevPos);
-
 				return true; //consumed
 			} else {
                 mPrevPos.x = mCurrPos.x;
@@ -336,65 +296,70 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 		FORTH
 	}
 
-	private boolean currDirection = true;
-    private boolean prevDirection = true;
+	private boolean currResult = true;
+    private boolean prevResult = true;
 
     private boolean isDirectionChanged() {
-        return !(prevDirection == currDirection);
+        return !(prevResult == currResult);
     }
 
 	boolean isRotatingClockwise(Position p, Position c) {
-//        p.x = -0.2177445f; p.y = 0.5021704f;
-//        c.x = -0.2177445f; c.y = 0.49648315f;
-        prevDirection = currDirection;
+        prevResult = currResult;
         float prevPos = cartesianToPolar(1 - p.x, 1 - p.y);
         if (prevPos < 0) prevPos = 360 + prevPos;
 
         float currPos = cartesianToPolar(1 - c.x, 1 - c.y);
         if (currPos < 0) currPos = 360 + currPos;
 
-        Log.d("ROT", "mPrevPos(x, y) = (" + mPrevPos.x + ", " + mPrevPos.y + ")");
-        Log.d("ROT", "mCurrPos(x, y) = (" + mCurrPos.x + ", " + mCurrPos.y + ")");
+		if (DBG) Log.d("ROT", "mPrevPos(x, y) = (" + mPrevPos.x + ", " + mPrevPos.y + ")");
+		if (DBG) Log.d("ROT", "mCurrPos(x, y) = (" + mCurrPos.x + ", " + mCurrPos.y + ")");
         float diff = currPos - prevPos;
-        Log.d("ROT", "diff = " + diff);
+		if (DBG) Log.d(TAG, "diff = " + diff);
 
         if (whichQuadrant(p.x, p.y) == Quadrant.FORTH) {
             if (whichQuadrant(c.x, c.y) == Quadrant.FIRST) {
-                currDirection = true;
-                if (currDirection != prevDirection) {
-                    mToneGenerator.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200);
-                }
-
+                currResult = true;
+				if (DBG) {
+					if (currResult != prevResult) {
+						mToneGenerator.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200);
+					}
+				}
                 return true;
             }
         }
 
         if (whichQuadrant(c.x, c.y) == Quadrant.FORTH) {
             if (whichQuadrant(p.x, p.y) == Quadrant.FIRST) {
-                Log.d("ROT", "move first to forth quadrant");
-                currDirection = false;
-                if (currDirection != prevDirection) {
-                    mToneGenerator.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200);
-                }
-
+				if (DBG) Log.d(TAG, "move first to forth quadrant");
+                currResult = false;
+				if (DBG) {
+					if (currResult != prevResult) {
+						mToneGenerator.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200);
+					}
+				}
                 return false;
             }
         }
 
         if (diff >= 0 ) {
-            currDirection = true;
-            if (currDirection != prevDirection) {
-                mToneGenerator.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200);
-            }
-            Log.d("ROT", "diff > 0 return true ");
+            currResult = true;
+			if (DBG) {
+				if (currResult != prevResult) {
+					mToneGenerator.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200);
+				}
+			}
+			if (DBG) Log.d(TAG, "diff > 0 return true ");
             return true;
         }
 
-        currDirection = false;
-        if (currDirection != prevDirection) {
-            mToneGenerator.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200);
-        }
-        Log.d("ROT", "return false ");
+        currResult = false;
+		if (DBG) {
+			if (currResult != prevResult) {
+				mToneGenerator.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200);
+			}
+		}
+
+		if (DBG) Log.d(TAG, "return false ");
 		return false;
 	}
 
@@ -406,7 +371,7 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 		else if (x >= 0.5 && y >= 0.5 ) quad = Quadrant.SECOND;
 		else if (x <= 0.5 && y >= 0.5) quad = Quadrant.THIRD;
 
-        Log.d("ROT", "quatrant = " + quad );
+		if (DBG) Log.d(TAG, "quadrant = " + quad );
         return quad;
 	}
 
