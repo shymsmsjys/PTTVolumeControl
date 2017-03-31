@@ -14,33 +14,6 @@ import android.widget.ImageView;
 import android.widget.ImageView.ScaleType;
 import android.widget.RelativeLayout;
 
-/*
-File:              RoundKnobButton
-Version:           1.0.0
-Release Date:      November, 2013
-License:           GPL v2
-Description:	   A round knob button to control volume and toggle between two states
-
-****************************************************************************
-Copyright (C) 2013 Radu Motisan  <radu.motisan@gmail.com>
-
-http://www.pocketmagic.net
-
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-****************************************************************************/
-
 public class RoundKnobButton extends RelativeLayout implements OnGestureListener {
 	private static final String TAG = "RoundKnobButton";
 	private  final boolean DBG = false;
@@ -116,13 +89,7 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
         mToneGenerator = new ToneGenerator(AudioManager.STREAM_ALARM, 100);
         mExceedLimit = true;
 	}
-	
-	/**
-	 * math..
-	 * @param x
-	 * @param y
-	 * @return
-	 */
+
 	private float cartesianToPolar(float x, float y) {
 		return (float) -Math.toDegrees(Math.atan2(x - 0.5f, y - 0.5f));
 	}
@@ -157,58 +124,40 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 	}
 
 	public void setRotorPosAngle(float deg) {
-
-		/*if (deg >= 210 || deg <= 150)*/ {
-//			if (deg > 180) deg = deg - 360;
-			Matrix matrix=new Matrix();
-			ivRotor.setScaleType(ScaleType.MATRIX);   
-			matrix.postRotate((float) deg, m_nWidth/2, m_nHeight/2);//getWidth()/2, getHeight()/2);
-			ivRotor.setImageMatrix(matrix);
-		}
+		Matrix matrix=new Matrix();
+		ivRotor.setScaleType(ScaleType.MATRIX);
+		matrix.postRotate((float) deg, m_nWidth/2, m_nHeight/2);//getWidth()/2, getHeight()/2);
+		ivRotor.setImageMatrix(matrix);
 	}
 	
 	public void setRotorPercentage(int percentage) {
 		int posDegree = percentage * 3 - 150;
-//		if (posDegree < 0) posDegree = 360 + posDegree;
         mKnobPostion  = posDegree;
 		setRotorPosAngle(posDegree);
 	}
-	
-	
+
 	public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
 		float x = e2.getX() / ((float) getWidth());
 		float y = e2.getY() / ((float) getHeight());
+		mCurrPos.x = x;
+		mCurrPos.y = y;
 
-        float rotDegrees = cartesianToPolar(1 - x, 1 - y);// 1- to correct our custom axis direction
+		float prevPos = cartesianToPolar(1 - mPrevPos.x, 1 - mPrevPos.y);
+        float currPos = cartesianToPolar(1 - x, 1 - y);// 1- to correct our custom axis direction
+		float diff = currPos - prevPos;
 
-        mCurrPos.x = x;
-        mCurrPos.y = y;
-//
-        float prevPos = cartesianToPolar(1 - mPrevPos.x, 1 - mPrevPos.y);
-//        if (prevPos < 0) prevPos = 360 + prevPos;
+		boolean isRotatingClockwise = isRotatingClockwise(mPrevPos, mCurrPos);
 
-        float currPos = rotDegrees;
-//        if (currPos < 0) currPos = 360 + currPos;
-
-//        int diff = (int)(Math.abs(currPos - prevPos));
-		float diff;
-		if (isRotatingClockwise(mPrevPos, mCurrPos)) {
-			if (prevPos < 0 && currPos > 0) {
-				diff = currPos - prevPos;
-			} else if (prevPos > 0 && currPos < 0) {
-				diff = 180 - prevPos + 180 + currPos;
-			} else {
-				diff = currPos - prevPos;
+		if (isRotatingClockwise) {
+			if (prevPos > 0 && currPos < 0) {
+				diff += 360;
 			}
 		} else {
-			if (prevPos > 0 && currPos < 0) {
-				diff = currPos - prevPos;
-			} else if (prevPos < 0 && currPos > 0) {
-				diff = -(180 - currPos + 180 + prevPos);
-			} else {
-				diff = currPos - prevPos;
+			if (prevPos < 0 && currPos > 0) {
+				diff -= 360;
 			}
 		}
+
         mKnobPostion += diff;
 
 		if (DBG) Log.d (TAG, "diff = " + diff + ", knob position = " + mKnobPostion);
@@ -218,7 +167,7 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
         }
 
 		if (mKnobPostion == -150) {
-			if (!isRotatingClockwise(mPrevPos, mCurrPos)) {
+			if (!isRotatingClockwise) {
 				if (DBG) Log.d(TAG, "limited 0");
 				mPrevPos.x = mCurrPos.x;
 				mPrevPos.y = mCurrPos.y;
@@ -235,7 +184,7 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
         }
 
 		if (mKnobPostion == 150) {
-			if (isRotatingClockwise(mPrevPos, mCurrPos)) {
+			if (isRotatingClockwise) {
 				if (DBG) Log.d(TAG, "limited 100");
 				mPrevPos.x = mCurrPos.x;
 				mPrevPos.y = mCurrPos.y;
@@ -247,39 +196,26 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 			}
 		}
 
-		if (! Float.isNaN(rotDegrees)) {
-			// instead of getting 0-> 180, -180 0 , we go for 0 -> 360
-			float posDegrees = rotDegrees;
-			if (rotDegrees < 0) posDegrees = 360 + rotDegrees;
-
-            // deny full rotation, start start and stop point, and get a linear scale
-			if (mKnobPostion >= -150 &&  mKnobPostion <= 150) {
-				// rotate our imageview
-				setRotorPosAngle(mKnobPostion);
-				// get a linear scale
-				float scaleDegrees = mKnobPostion + 150; // given the current parameters, we go from 0 to 300
-				// get position percent
-				mPercent = (int) (scaleDegrees / 3);
-				if (m_listener != null) m_listener.onRotate(mPercent);
-                mPrevPos.x = mCurrPos.x;
-                mPrevPos.y = mCurrPos.y;
-				return true; //consumed
-			} else {
-                mPrevPos.x = mCurrPos.x;
-                mPrevPos.y = mCurrPos.y;
-                return false;
-            }
+		// deny full rotation, start start and stop point, and get a linear scale
+		if (mKnobPostion >= -150 &&  mKnobPostion <= 150) {
+			// rotate our imageview
+			setRotorPosAngle(mKnobPostion);
+			// get a linear scale
+			float scaleDegrees = mKnobPostion + 150; // given the current parameters, we go from 0 to 300
+			// get position percent
+			mPercent = (int) (scaleDegrees / 3);
+			if (m_listener != null) m_listener.onRotate(mPercent);
+			mPrevPos.x = mCurrPos.x;
+			mPrevPos.y = mCurrPos.y;
+			return true; //consumed
 		} else {
-            mPrevPos.x = mCurrPos.x;
-            mPrevPos.y = mCurrPos.y;
-            return false; // not consumed
-        }
+			mPrevPos.x = mCurrPos.x;
+			mPrevPos.y = mCurrPos.y;
+			return false;
+		}
 	}
 
-	public void onShowPress(MotionEvent e) {
-		// TODO Auto-generated method stub
-		
-	}
+	public void onShowPress(MotionEvent e) { }
 	public boolean onFling(MotionEvent arg0, MotionEvent arg1, float arg2, float arg3) { return false; }
 
 	public void onLongPress(MotionEvent e) {	}
@@ -374,6 +310,4 @@ public class RoundKnobButton extends RelativeLayout implements OnGestureListener
 		if (DBG) Log.d(TAG, "quadrant = " + quad );
         return quad;
 	}
-
-
 }
